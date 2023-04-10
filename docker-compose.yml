@@ -1,0 +1,80 @@
+version: '3.9'
+
+services:
+
+  firebird:
+    build: 
+        context: .
+        args:
+            - NODE_ENV=local
+        dockerfile: Dockerfile_firebird
+    volumes:
+        - FireBird_db:/var/MagicServer/Data
+    container_name: firebird
+    hostname: firebird
+    restart: unless-stopped
+    environment:
+      TZ: "Europe/Moscow"
+    networks:
+      - default
+
+  server:
+    build: 
+        context: .
+        args:
+            - NODE_ENV=local
+        dockerfile: Dockerfile_server
+    volumes:
+        - MagicServer_logs:/var/log/MagicSoftServer
+        - MagicServer_config:/etc/MagicSoft
+        - HASP_license:/var/hasplm/installed/
+    container_name: server
+    hostname: server
+    depends_on:
+        - firebird
+    ports:
+        - 62450:62450
+        - 8500:8500
+        - 1947:1947
+    restart: unless-stopped
+    environment:
+      TZ: "Europe/Moscow"
+    networks:
+      - default
+      
+  agent:
+    build: 
+        context: .
+        args:
+            - NODE_ENV=local
+        dockerfile: Dockerfile_agent
+    volumes:
+        - MagicAgent_logs:/var/log/MagicServer
+        - MagicAgent_config:/etc/MagicSoft
+    container_name: agent
+    hostname: agent
+    depends_on:
+        - server
+    ports:
+        - 8501:8501
+    restart: unless-stopped
+    environment:
+      TZ: "Europe/Moscow"
+    networks:
+      - default
+
+volumes:
+    HASP_license:
+    FireBird_db:
+    MagicServer_logs:
+    MagicAgent_logs:
+    MagicAgent_config:
+    MagicServer_config:
+
+
+networks:
+  default:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/16

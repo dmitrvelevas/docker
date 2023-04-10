@@ -1,0 +1,25 @@
+FROM ubuntu
+
+WORKDIR /root
+
+ENV new_password "1werty123"
+
+#устанавливаем firebird и разрешаем удалённый доступ с любого адреса 0.0.0.0
+RUN apt update && \
+    apt install -y firebird3.0-common firebird3.0-doc firebird3.0-server-core firebird-dev firebird3.0-common-doc firebird3.0-server && \
+    sed -i "s/#RemoteAccess = true/RemoteAccess = true/" /etc/firebird/3.0/firebird.conf && \
+    sed -i "s/RemoteBindAddress = localhost/RemoteBindAddress = 0.0.0.0/" /etc/firebird/3.0/firebird.conf
+
+#задаём внешний пароль из переменной new_password для доступа к бд
+RUN password=$(grep -Po 'ISC_PASSWORD="\K.*[^"]' /etc/firebird/3.0/SYSDBA.password) && \
+	  gsec -user sysdba -pass ${password} -mo sysdba -pw ${new_password}
+	  
+#копируем deb-пакет, извлекаем default.fdb в нужное место, удаляем лишнее
+ADD MagicServer*.deb .
+RUN dpkg --extract MagicServer*.deb . && \
+    mkdir -p /var/MagicServer/Data && \
+	cp -r ./var/MagicServer/Data/default.fdb /var/MagicServer/Data && \
+	rm -rf *
+
+#Запускаем firebird
+ENTRYPOINT [ "/usr/sbin/firebird" ]

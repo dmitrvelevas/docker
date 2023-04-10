@@ -1,0 +1,46 @@
+FROM ubuntu
+
+#адрес базы данных
+ENV db_address "firebird"
+
+WORKDIR /root
+
+RUN apt update
+
+#клиент для работы с удалённой базой и openssl для opc ua
+RUN apt install -y firebird3.0-utils openssl
+ 
+#устанавливаем hasp, копируем библиотеку для работы с программными ключами в нужное место, разрешаем удалённые подключения
+ADD HASP ./HASP
+RUN dpkg -i HASP/pkg/aksusbd_8.43-1_amd64.deb && \
+    mkdir -p /var/hasplm/update && \
+    cp -p HASP/haspvlib_61665.so /var/hasplm/update && \
+    cp -p HASP/haspvlib_x86_64_61665.so /var/hasplm && \
+    echo "ACCremote = 1" >> /etc/hasplm/hasplm.ini
+
+#копируем deb-пакет, разархивируем и распихиваем файлы по местам
+ADD MagicServer*.deb .
+RUN dpkg --extract MagicServer*.deb . && \
+    mkdir -p /etc/MagicSoft && \
+    cp  ./etc/MagicSoft/MagicServer.xml /etc/MagicSoft && \
+	cp -r ./usr/* /usr && \
+	cp -r ./var/* /var && \
+	rm -rf * && \
+    #задаём ip адрес базы данных, здесь я полагаюсь на то, что дефолтное значение 127.0.0.1 постоянно и встречается в конфигурации только один раз
+    sed -i "s/127.0.0.1/${db_address}/" /etc/MagicSoft/MagicServer.xml 
+
+#копируем ключ и кладём его в нужное место
+ADD MagicSoftSCADA*.v2c .
+RUN mkdir -p /var/hasplm/installed && mv MagicSoftSCADA*.v2c /var/hasplm/installed/
+
+#уровень логгирования
+#RUN sed -i "s/warning/trace/" /etc/MagicSoft/MagicServer.xml && sed -i "s/information/trace/" /etc/MagicSoft/MagicServer.xml 
+	
+#пробрасываем наружу порты, если есть необходимость
+EXPOSE 8500/tcp
+EXPOSE 62450/tcp
+
+#сначала стартуем hasplm, потом сервер
+CMD /usr/sbin/hasplmd_x86_64 -u root; /usr/bin/MagicServer 
+
+

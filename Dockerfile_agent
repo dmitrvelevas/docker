@@ -1,0 +1,30 @@
+FROM ubuntu
+
+#адрес базы данных
+ENV srv_address "server"
+
+WORKDIR /root
+
+RUN apt update
+
+#копируем deb-пакет, разархивируем и распихиваем файлы по местам
+ADD MagicServer*.deb .
+RUN dpkg --extract MagicServer*.deb .
+RUN mkdir -p /etc/MagicSoft && \
+    cp  ./etc/MagicSoft/MagicAgent.xml /etc/MagicSoft && \
+	cp -r ./usr/* /usr && \
+	cp -r ./var/* /var && \
+	rm -rf * && \
+    #задаём ip адрес сервера, здесь я полагаюсь на то, что дефолтное значение 127.0.0.1 постоянно и встречается в конфигурации только один раз
+    sed -i "s/<host>127.0.0.1<\/host>/<host>${srv_address}<\/host>/" /etc/MagicSoft/MagicAgent.xml
+
+#уровень логгирования
+#RUN sed -i "s/information/trace/" /etc/MagicSoft/MagicAgent.xml && sed -i "s/warning/trace/" /etc/MagicSoft/HotReserveAgent.xml
+
+#пробрасываем наружу порты, если есть необходимость
+EXPOSE 8501/tcp
+
+# запускаем агент
+ENTRYPOINT [ "/usr/bin/MagicAgent" ]
+#CMD /bin/bash
+
